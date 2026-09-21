@@ -44,7 +44,7 @@ jobs:
       - name: Apply universal-build patch
         run: |
           set -euo pipefail
-          if ! git -C agterm-src apply --whitespace=nowarn patches/universal-build.patch; then
+          if ! git -C agterm-src apply --whitespace=nowarn "$GITHUB_WORKSPACE/patches/universal-build.patch"; then
             echo "::error::patches/universal-build.patch failed to apply against ${{ steps.resolve.outputs.ref }} — upstream likely changed project.yml or scripts/setup.sh since this patch was generated. Regenerate it (see README.md) and retry." >&2
             exit 1
           fi

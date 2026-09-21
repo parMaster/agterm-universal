@@ -111,6 +111,13 @@ signature), and publishes it as a release tagged `<upstream-tag>-universal`.
 - add newly discovered tasks with ➕ prefix
 - document issues/blockers with ⚠️ prefix
 
+⚠️ First live dispatch (run 35591370088) failed at "Apply universal-build patch": the step used
+`git -C agterm-src apply ... patches/universal-build.patch`, but `-C agterm-src` makes git resolve
+that relative path from inside `agterm-src`, not the workspace root where `patches/` actually lives
+— `git apply` doesn't cd like a shell `cd` would for a plain relative path outside `-C`. Fixed by
+pointing at `"$GITHUB_WORKSPACE/patches/universal-build.patch"` instead, in both the workflow file
+and this plan's Task 2.
+
 ## Implementation Steps
 
 ### Task 1: Add the universal-build patch
@@ -290,7 +297,7 @@ jobs:
       - name: Apply universal-build patch
         run: |
           set -euo pipefail
-          if ! git -C agterm-src apply --whitespace=nowarn patches/universal-build.patch; then
+          if ! git -C agterm-src apply --whitespace=nowarn "$GITHUB_WORKSPACE/patches/universal-build.patch"; then
             echo "::error::patches/universal-build.patch failed to apply against ${{ steps.resolve.outputs.ref }} — upstream likely changed project.yml or scripts/setup.sh since this patch was generated. Regenerate it (see README.md) and retry." >&2
             exit 1
           fi
