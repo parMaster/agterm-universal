@@ -125,7 +125,7 @@ and this plan's Task 2.
 **Files:**
 - Create: `patches/universal-build.patch`
 
-- [ ] **Write the patch file** with exactly this content (already generated and verified with
+- [x] **Write the patch file** with exactly this content (already generated and verified with
   `git apply --check` against a fresh `v0.31.0` checkout of `umputun/agterm` this session):
 
 ```diff
@@ -229,7 +229,7 @@ index 5a01f72..2d32dd4 100755
  fi
 ```
 
-- [ ] **Confirm it still applies cleanly** before moving on (belt-and-suspenders re-check; it was
+- [x] **Confirm it still applies cleanly** before moving on (belt-and-suspenders re-check; it was
   already verified this session, but re-verify against a fresh clone since the working tree used to
   generate it was a scratch worktree that no longer exists):
 
@@ -248,7 +248,7 @@ index 5a01f72..2d32dd4 100755
 **Files:**
 - Create: `.github/workflows/build-universal.yml`
 
-- [ ] **Write the workflow**:
+- [x] **Write the workflow**:
 
 ```yaml
 name: Build universal agterm
@@ -346,7 +346,7 @@ jobs:
             --notes "Unofficial universal (arm64+x86_64) build of umputun/agterm ${{ steps.resolve.outputs.ref }}, built by applying patches/universal-build.patch on top of unmodified upstream source. Ad-hoc signed, not notarized — see this repo's README before opening it."
 ```
 
-- [ ] **Sanity-check the YAML** before committing:
+- [x] **Sanity-check the YAML** before committing:
 
   ```bash
   ruby -ryaml -e "YAML.load_file('.github/workflows/build-universal.yml')" && echo "YAML OK"
@@ -361,7 +361,7 @@ jobs:
 **Files:**
 - Create: `README.md`
 
-- [ ] **Write it**:
+- [x] **Write it**:
 
 ```markdown
 # agterm-universal
@@ -422,7 +422,7 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
 
 ### Task 4: Commit and push
 
-- [ ] **Stage and commit everything** (the one summary commit for this whole plan):
+- [x] **Stage and commit everything** (the one summary commit for this whole plan):
 
   ```bash
   cd /Users/gusto/go/src/agterm-universal
@@ -432,7 +432,7 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
 
   Expected: all four new files listed under "Changes to be committed", nothing else.
 
-- [ ] **Commit**:
+- [x] **Commit**:
 
   ```bash
   git commit -m "$(cat <<'EOF'
@@ -444,7 +444,7 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
   )"
   ```
 
-- [ ] **Push**:
+- [x] **Push**:
 
   ```bash
   git push -u origin main
@@ -455,7 +455,7 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
 
 ### Task 5: Dispatch and verify
 
-- [ ] **Trigger a build** for the current latest release (`v0.31.0` as of this plan; re-check with
+- [x] **Trigger a build** for the current latest release (`v0.31.0` as of this plan; re-check with
   `gh release list --repo umputun/agterm --limit 1` in case a newer one shipped by the time you run
   this):
 
@@ -463,7 +463,8 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
   gh workflow run build-universal.yml --repo parMaster/agterm-universal
   ```
 
-- [ ] **Watch it run**:
+- [x] **Watch it run**: first dispatch (run 35591370088) failed at the patch step (see ⚠️ above);
+  fixed and pushed as commit `1d207c2`; second dispatch (run 35591512005) succeeded end to end.
 
   ```bash
   sleep 5
@@ -478,7 +479,7 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
   binary named in the error — re-check that step's edits against Task 1's diff before touching
   anything else.
 
-- [ ] **Confirm the release**:
+- [x] **Confirm the release**: `v0.31.0-universal` published with asset `agterm-v0.31.0-universal.zip`.
 
   ```bash
   gh release view "$(gh release list --repo parMaster/agterm-universal --limit 1 --json tagName --jq '.[0].tagName')" \
@@ -487,8 +488,9 @@ Re-dispatching for a tag that already has a release just replaces it — the wor
 
   Expected: shows a release tagged `<tag>-universal` with one `agterm-<tag>-universal.zip` asset.
 
-- [ ] **Spot-check the artifact locally** (confirms the whole chain, not just that CI reported
-  green):
+- [x] **Spot-check the artifact locally** (confirms the whole chain, not just that CI reported
+  green): downloaded and confirmed `agterm`, `agtermctl`, `agterm-session-host`, and `zmx` are all
+  `x86_64 arm64` fat binaries, and the app bundle is signed.
 
   ```bash
   cd /tmp
