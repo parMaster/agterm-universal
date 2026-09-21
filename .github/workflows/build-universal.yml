@@ -1,0 +1,93 @@
+name: Build universal agterm
+
+on:
+  workflow_dispatch:
+    inputs:
+      agterm_ref:
+        description: >-
+          umputun/agterm tag to build (e.g. v0.31.0). Leave empty to use
+          upstream's latest release.
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Resolve target tag
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ref="${{ inputs.agterm_ref }}"
+          if [ -z "$ref" ]; then
+            ref="$(gh api repos/umputun/agterm/releases/latest --jq .tag_name)"
+          fi
+          echo "using upstream ref: $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout umputun/agterm
+        uses: actions/checkout@v7
+        with:
+          repository: umputun/agterm
+          ref: ${{ steps.resolve.outputs.ref }}
+          path: agterm-src
+
+      - name: Apply universal-build patch
+        run: |
+          set -euo pipefail
+          if ! git -C agterm-src apply --whitespace=nowarn patches/universal-build.patch; then
+            echo "::error::patches/universal-build.patch failed to apply against ${{ steps.resolve.outputs.ref }} — upstream likely changed project.yml or scripts/setup.sh since this patch was generated. Regenerate it (see README.md) and retry." >&2
+            exit 1
+          fi
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Build universal agterm.app
+        working-directory: agterm-src
+        run: ./scripts/build.sh
+
+      - name: Verify universal binaries
+        working-directory: agterm-src
+        run: |
+          set -euo pipefail
+          app="build/DerivedData/Build/Products/Release/agterm.app"
+          for bin in agterm agtermctl agterm-session-host zmx; do
+            archs="$(lipo -archs "$app/Contents/MacOS/$bin")"
+            echo "$bin: $archs"
+            if [[ "$archs" != *arm64* || "$archs" != *x86_64* ]]; then
+              echo "::error::$bin is not universal (archs: $archs)" >&2
+              exit 1
+            fi
+          done
+
+      - name: Package app
+        id: package
+        working-directory: agterm-src
+        run: |
+          set -euo pipefail
+          app="build/DerivedData/Build/Products/Release/agterm.app"
+          zip_name="agterm-${{ steps.resolve.outputs.ref }}-universal.zip"
+          ditto -c -k --keepParent "$app" "$zip_name"
+          echo "zip_path=agterm-src/$zip_name" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.resolve.outputs.ref }}-universal"
+          gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" "${{ steps.package.outputs.zip_path }}" \
+            --repo "${{ github.repository }}" \
+            --title "agterm ${{ steps.resolve.outputs.ref }} (universal arm64+x86_64)" \
+            --notes "Unofficial universal (arm64+x86_64) build of umputun/agterm ${{ steps.resolve.outputs.ref }}, built by applying patches/universal-build.patch on top of unmodified upstream source. Ad-hoc signed, not notarized — see this repo's README before opening it."
