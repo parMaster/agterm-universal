@@ -5,10 +5,13 @@ on:
     inputs:
       agterm_ref:
         description: >-
-          umputun/agterm tag to build (e.g. v0.31.0). Leave empty to use
-          upstream's latest release.
+          umputun/agterm tag to build. Defaults to the tag
+          patches/universal-build.patch is currently verified against — bump this
+          default in the same commit as each patch regen (see README). Override to
+          re-run a past release, or to try a newer upstream tag before its patch has
+          been regenerated.
         required: false
-        default: ""
+        default: "v0.32.0"
 
 permissions:
   contents: write
@@ -23,14 +26,9 @@ jobs:
 
       - name: Resolve target tag
         id: resolve
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           ref="${{ inputs.agterm_ref }}"
-          if [ -z "$ref" ]; then
-            ref="$(gh api repos/umputun/agterm/releases/latest --jq .tag_name)"
-          fi
           echo "using upstream ref: $ref"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 

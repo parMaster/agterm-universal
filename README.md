@@ -10,10 +10,12 @@ This repo carries no copy of agterm's source — only a small patch
 
 ## Getting a build
 
-Go to Actions → "Build universal agterm" → "Run workflow". Leave the `agterm_ref` input empty to
-build the latest upstream release, or give it a specific tag (e.g. `v0.30.0`) to build an older one.
-When it finishes, the build is attached as a release in this repo's Releases tab, tagged
-`<upstream-tag>-universal`.
+Go to Actions → "Build universal agterm" → "Run workflow". The `agterm_ref` input defaults to the
+tag `patches/universal-build.patch` is currently verified against — leave it as-is for a normal
+build. Override it to re-run a specific past release, or to try a newer upstream tag before its
+patch has been regenerated (may fail at "Apply universal-build patch" — see below, and note that
+requesting an *older* tag than the pinned one can fail there too). When it finishes, the build is
+attached as a release in this repo's Releases tab, tagged `<upstream-tag>-universal`.
 
 ## Installing (or updating) a build
 
@@ -88,10 +90,12 @@ equivalent of stripping quarantine.
 
 ## When a build fails at "Apply universal-build patch"
 
-This means upstream changed `project.yml` or `scripts/setup.sh` in a way that no longer matches the
-patch's context lines — expected occasionally, since agterm's build scripts change fairly often
-(they gained a new bundled tool and bumped their zig version in the ~6 weeks after this patch was
-first written). To fix:
+This means the tag you're building has a `project.yml`/`scripts/setup.sh` shape that no longer
+matches the patch's context lines — expected occasionally, since agterm's build scripts change
+fairly often (they gained a new bundled tool and bumped their zig version in the ~6 weeks after
+this patch was first written). It cuts both ways: a tag *older* than the one the patch was last
+generated against can fail here too, not just a newer one — the patch is tied to one point in
+upstream's history, not to "this tag and everything after it." To fix:
 
 1. Clone the failing tag fresh: `git clone --branch <tag> --depth 1 https://github.com/umputun/agterm /tmp/agterm-src`
 2. Re-apply the same intent by hand in `/tmp/agterm-src`:
@@ -109,7 +113,11 @@ first written). To fix:
    git -C /tmp/agterm-verify apply --check /path/to/agterm-universal/patches/universal-build.patch
    rm -rf /tmp/agterm-verify
    ```
-   Silence and a `0` exit code mean it applies cleanly. Commit and re-dispatch the workflow.
+   Silence and a `0` exit code mean it applies cleanly.
+5. Bump the `agterm_ref` input's `default` in `.github/workflows/build-universal.yml` to `<tag>`,
+   so the next build without an explicit override targets the tag this patch was just verified
+   against.
+6. Commit both changes together and re-dispatch the workflow.
 
 ## Re-running a tag you already built
 
