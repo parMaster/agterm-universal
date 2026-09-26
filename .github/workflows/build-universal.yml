@@ -12,9 +12,15 @@ on:
           been regenerated.
         required: false
         default: "v0.32.0"
+      report_failure:
+        description: Open an issue if the build fails (set by check-upstream.yml).
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   build:
@@ -89,3 +95,18 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "agterm ${{ steps.resolve.outputs.ref }} (universal arm64+x86_64)" \
             --notes "Unofficial universal (arm64+x86_64) build of umputun/agterm ${{ steps.resolve.outputs.ref }}, built by applying patches/universal-build.patch on top of unmodified upstream source. Ad-hoc signed, not notarized — see this repo's README before opening it."
+
+      - name: Open issue for build failure
+        if: failure() && inputs.report_failure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.resolve.outputs.ref }}"
+          title="Universal build failed for upstream $tag"
+          if [ -n "$(gh issue list --repo "${{ github.repository }}" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
+            echo "issue already open: $title"
+            exit 0
+          fi
+          gh issue create --repo "${{ github.repository }}" --title "$title" --body \
+            "Scheduled universal build of umputun/agterm \`$tag\` failed after the patch applied cleanly. See the failing step in the run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

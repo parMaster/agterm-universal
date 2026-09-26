@@ -17,6 +17,24 @@ patch has been regenerated (may fail at "Apply universal-build patch" — see be
 requesting an *older* tag than the pinned one can fail there too). When it finishes, the build is
 attached as a release in this repo's Releases tab, tagged `<upstream-tag>-universal`.
 
+## Automatic builds of new upstream releases
+
+`.github/workflows/check-upstream.yml` runs daily (and on demand from the Actions tab). It looks up
+upstream's latest release and does nothing if `<tag>-universal` already exists here. Otherwise it
+checks whether the patch applies to that tag:
+
+- **It applies** — dispatches "Build universal agterm" for that tag, which publishes the release as
+  usual. If that build fails, it opens an issue titled `Universal build failed for upstream <tag>`.
+- **It doesn't apply** — opens an issue titled `Patch does not apply to upstream <tag>` with the
+  `git apply` output. See [below](#when-a-build-fails-at-apply-universal-build-patch) for the fix.
+
+Each issue is opened once per tag. While a build-failure issue is open, the daily check won't retry
+the build; close the issue to let it try again. An auto-build doesn't move the pinned `agterm_ref`
+default; bump it yourself when convenient.
+
+GitHub disables scheduled workflows after 60 days with no repo activity. If upstream goes quiet
+long enough for that to happen, re-enable the workflow from the Actions tab.
+
 ## Installing (or updating) a build
 
 These steps work the same on Apple Silicon and Intel Macs; the only per-machine detail is the
@@ -117,7 +135,8 @@ upstream's history, not to "this tag and everything after it." To fix:
 5. Bump the `agterm_ref` input's `default` in `.github/workflows/build-universal.yml` to `<tag>`,
    so the next build without an explicit override targets the tag this patch was just verified
    against.
-6. Commit both changes together and re-dispatch the workflow.
+6. Commit both changes together and re-dispatch the workflow. If an auto-opened issue tracked this,
+   close it once the release is published.
 
 ## Re-running a tag you already built
 

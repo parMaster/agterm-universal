@@ -1,0 +1,84 @@
+name: Check upstream release
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v7
+
+      - name: Resolve upstream latest release
+        id: latest
+        run: |
+          set -euo pipefail
+          tag="$(gh release view --repo umputun/agterm --json tagName --jq .tagName)"
+          echo "upstream latest: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "${tag}-universal" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "${tag}-universal already released here, nothing to do"
+            echo "built=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "built=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check patch applies
+        id: patch
+        if: steps.latest.outputs.built == 'false'
+        run: |
+          set -euo pipefail
+          git -c advice.detachedHead=false clone --quiet --depth 1 --branch "${{ steps.latest.outputs.tag }}" \
+            https://github.com/umputun/agterm.git agterm-src
+          if git -C agterm-src apply --check --whitespace=nowarn "$GITHUB_WORKSPACE/patches/universal-build.patch" 2> apply.log; then
+            echo "applies=true" >> "$GITHUB_OUTPUT"
+          else
+            cat apply.log
+            echo "applies=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open issue for patch failure
+        if: steps.patch.outputs.applies == 'false'
+        run: |
+          set -euo pipefail
+          tag="${{ steps.latest.outputs.tag }}"
+          title="Patch does not apply to upstream $tag"
+          if [ -n "$(gh issue list --repo "${{ github.repository }}" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
+            echo "issue already open: $title"
+            exit 0
+          fi
+          {
+            echo "\`patches/universal-build.patch\` no longer applies to umputun/agterm \`$tag\`."
+            echo
+            echo '```'
+            cat apply.log
+            echo '```'
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo "Regenerate the patch per README → \"When a build fails at 'Apply universal-build patch'\"."
+          } > body.md
+          gh issue create --repo "${{ github.repository }}" --title "$title" --body-file body.md
+
+      - name: Dispatch universal build
+        if: steps.patch.outputs.applies == 'true'
+        run: |
+          set -euo pipefail
+          title="Universal build failed for upstream ${{ steps.latest.outputs.tag }}"
+          if [ -n "$(gh issue list --repo "${{ github.repository }}" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
+            echo "open issue \"$title\" — not retrying until it's closed"
+            exit 0
+          fi
+          gh workflow run build-universal.yml --repo "${{ github.repository }}" \
+            -f agterm_ref="${{ steps.latest.outputs.tag }}" -f report_failure=true
