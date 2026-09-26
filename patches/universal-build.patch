@@ -25,7 +25,7 @@ index daabdde..7e60255 100644
            cli_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agtermctl"
            host_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agterm-session-host"
 diff --git a/scripts/setup.sh b/scripts/setup.sh
-index 5a01f72..2d32dd4 100755
+index 48cb070..f6203f3 100755
 --- a/scripts/setup.sh
 +++ b/scripts/setup.sh
 @@ -21,14 +21,20 @@ GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
@@ -51,7 +51,7 @@ index 5a01f72..2d32dd4 100755
  # terminfo/ is the marker: it must extract as a SIBLING of ghostty/ so libghostty's
  # TERMINFO=dirname(GHOSTTY_RESOURCES_DIR)/terminfo derivation resolves xterm-ghostty.
  RESOURCES_MARKER="agterm/Resources/terminfo"
-@@ -57,7 +63,7 @@ fi
+@@ -62,7 +68,7 @@ fi
  
  # a stale stamp restages BOTH: they come out of one build, and an artifact built from another revision
  # cannot be told apart from a current one.
@@ -60,7 +60,7 @@ index 5a01f72..2d32dd4 100755
    need_xc=true
    need_res=true
  fi
-@@ -145,7 +151,7 @@ if $need_xc || $need_res; then
+@@ -150,7 +156,7 @@ if $need_xc || $need_res; then
  
    echo "building GhosttyKit.xcframework with zig (a few minutes)..."
    ( cd "$ghostty_build" && "$ZIG" build -Doptimize=ReleaseFast -Demit-xcframework=true \
@@ -69,7 +69,7 @@ index 5a01f72..2d32dd4 100755
  
    if $need_xc; then
      echo "staging GhosttyKit.xcframework..."
-@@ -161,7 +167,7 @@ if $need_xc || $need_res; then
+@@ -166,7 +172,7 @@ if $need_xc || $need_res; then
      cp -R "$ghostty_build/zig-out/share/ghostty/themes" agterm/Resources/ghostty/
      cp -R "$ghostty_build/zig-out/share/terminfo" agterm/Resources/terminfo
    fi
@@ -78,7 +78,7 @@ index 5a01f72..2d32dd4 100755
  fi
  
  if $need_zmx; then
-@@ -174,11 +180,14 @@ if $need_zmx; then
+@@ -183,11 +189,14 @@ if $need_zmx; then
  
    patch_zig_float_h
  
@@ -94,5 +94,5 @@ index 5a01f72..2d32dd4 100755
 +    "$BUILD_DIR/zmx-arm64/bin/zmx" "$BUILD_DIR/zmx-x86_64/bin/zmx"
 +  chmod 0755 "$ZMX_STAGE_DIR/zmx"
    cp "$zmx_build/LICENSE" "$ZMX_STAGE_DIR/LICENSE"
-   printf '%s %s\n' "$ZMX_REV" "$ZMX_TARGET" > "$ZMX_STAMP_FILE"
+   printf '%s\n' "$ZMX_STAMP" > "$ZMX_STAMP_FILE"
  fi
