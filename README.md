@@ -37,74 +37,41 @@ long enough for that to happen, re-enable the workflow from the Actions tab.
 
 ## Installing (or updating) a build
 
-These steps work the same on Apple Silicon and Intel Macs; the only per-machine detail is the
-Homebrew prefix in step 5, which the commands below resolve automatically rather than hardcode.
+One command, the same on Apple Silicon and Intel Macs. It needs only `curl`, so it works on a fresh
+Mac without a clone of this repo:
 
-1. If a Homebrew-managed `agterm` cask is installed and you want this build to replace it instead,
-   remove just the app and its `agtermctl` symlink. **Never pass `--zap`** — that also deletes the
-   live app's state and control-socket directory (`~/Library/Application Support/agterm`), which
-   breaks a currently-running instance's control socket:
+```bash
+curl -fsSL https://raw.githubusercontent.com/parMaster/agterm-universal/main/install.sh | bash
+```
 
-   ```bash
-   brew list --cask agterm >/dev/null 2>&1 && brew uninstall --cask agterm
-   ```
+That installs the latest release. To install a specific one, pass its tag (with or without the
+`-universal` suffix):
 
-   If agterm isn't installed via Homebrew at all (e.g. this is a fresh Mac), this is a no-op — skip
-   straight to step 2.
+```bash
+curl -fsSL https://raw.githubusercontent.com/parMaster/agterm-universal/main/install.sh | bash -s -- v0.33.1
+```
 
-2. Download the release you want. Empty/omitted tag = the newest one:
+From a clone, `./install.sh [tag]` does the same. What it does, in order:
 
-   ```bash
-   tag="$(gh release list --repo parMaster/agterm-universal --limit 1 --json tagName --jq '.[0].tagName')"
-   rm -rf /tmp/agterm-install && mkdir -p /tmp/agterm-install
-   gh release download "$tag" --repo parMaster/agterm-universal --pattern '*.zip' --dir /tmp/agterm-install --clobber
-   ```
+1. Downloads the release zip into a temporary directory and checks that the app inside is universal
+   (`arm64` and `x86_64`). Nothing installed is touched before this passes, so a failed download or
+   a wrong tag leaves the current install as it was.
+2. If a Homebrew-managed `agterm` cask is installed, removes it with a plain
+   `brew uninstall --cask agterm`. **Never run that with `--zap`** — it also deletes the live app's
+   state and control-socket directory (`~/Library/Application Support/agterm`), which breaks a
+   currently-running instance's control socket.
+3. Replaces `/Applications/agterm.app` and strips the quarantine attribute, so Gatekeeper doesn't
+   block the ad-hoc-signed (non-notarized) app.
+4. Links `agtermctl` into `$(brew --prefix)/bin` — `/opt/homebrew` on Apple Silicon, `/usr/local` on
+   Intel Macs. Without Homebrew it skips this and prints the `ln -sf` line to run yourself.
+5. Prints the installed architectures and signature, and checks that `agtermctl` runs.
 
-   No `gh` CLI, or not authenticated? Download the `.zip` asset by hand from
-   <https://github.com/parMaster/agterm-universal/releases/latest> instead — a browser download sets
-   a `com.apple.quarantine` attribute that step 4 below removes; a `gh release download` does not set
-   one, so step 4 is then a no-op safety net rather than a required step.
+**If you're replacing an agterm that's currently running**, the script only touches files on disk —
+it never quits or relaunches anything, and replacing files under a running app's bundle doesn't kill
+it on macOS. Quit and reopen the app yourself whenever it's convenient.
 
-3. Unzip and move it into place (this overwrites any existing `/Applications/agterm.app`, but does
-   **not** touch a process already running from the old one — deleting/replacing files under a
-   running app's bundle doesn't kill it on macOS):
-
-   ```bash
-   cd /tmp/agterm-install
-   unzip -q ./*.zip
-   rm -rf /Applications/agterm.app
-   mv agterm.app /Applications/agterm.app
-   ```
-
-4. Strip quarantine so Gatekeeper doesn't block the ad-hoc-signed (non-notarized) app:
-
-   ```bash
-   xattr -cr /Applications/agterm.app
-   ```
-
-5. Put `agtermctl` on `PATH` the same way the Homebrew cask used to, but resolve the Homebrew prefix
-   instead of hardcoding it — it's `/opt/homebrew` on Apple Silicon and `/usr/local` on Intel Macs:
-
-   ```bash
-   ln -sf /Applications/agterm.app/Contents/MacOS/agtermctl "$(brew --prefix)/bin/agtermctl"
-   ```
-
-6. Verify before opening it:
-
-   ```bash
-   lipo -archs /Applications/agterm.app/Contents/MacOS/agterm   # expect: x86_64 arm64
-   codesign -dv /Applications/agterm.app                         # ad-hoc signed, TeamIdentifier=not set
-   agtermctl --help                                              # confirms the PATH symlink works
-   ```
-
-7. **If you're replacing an agterm that's currently running** (as opposed to a fresh install with
-   nothing running yet), steps 1-6 only ever touched files on disk — they never quit or relaunched
-   anything. Deciding when to quit and reopen the running app is the person's call, not an automated
-   one; do that last, by hand, whenever it's convenient.
-
-If Gatekeeper still complains after step 4 (e.g. you skipped it and downloaded via browser instead),
-right-click (Control-click) `agterm.app` → Open, and confirm at the prompt — this is the manual
-equivalent of stripping quarantine.
+If Gatekeeper still complains, right-click (Control-click) `agterm.app` → Open, and confirm at the
+prompt — this is the manual equivalent of stripping quarantine.
 
 ## When a build fails at "Apply universal-build patch"
 
