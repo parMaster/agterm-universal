@@ -1,5 +1,5 @@
 diff --git a/project.yml b/project.yml
-index daabdde..7e60255 100644
+index 75762e6..13f3240 100644
 --- a/project.yml
 +++ b/project.yml
 @@ -16,7 +16,7 @@ settings:
@@ -25,13 +25,13 @@ index daabdde..7e60255 100644
            cli_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agtermctl"
            host_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agterm-session-host"
 diff --git a/scripts/setup.sh b/scripts/setup.sh
-index 48cb070..f6203f3 100755
+index 6a96a3c..9e56e83 100755
 --- a/scripts/setup.sh
 +++ b/scripts/setup.sh
 @@ -21,14 +21,20 @@ GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
  GHOSTTY_REV="683d8db643b95cf229bfb5fe9fab9ae677920343"  # 2026-08-25
  ZMX_REPO="https://github.com/neurosnap/zmx"
- ZMX_REV="8bab1f0173b07e79835ea372d749af3dbf0d0842"  # v0.8.1, 2026-09-05
+ ZMX_REV="8bab1f0173b07e79835ea372d749af3dbf0d0842"  # v0.8.1, 2026-09-05; SessionHostRuntime/DeviceAttributeResponder.swift copies its DA replies
 -# zig defaults to the builder's OS version and CPU; ship the app's arm64/macOS 14 baseline.
 -ZMX_TARGET="aarch64-macos.14.0"
 +# local patch (agterm-universal): build zmx as a universal (arm64+x86_64) binary alongside
@@ -51,7 +51,7 @@ index 48cb070..f6203f3 100755
  # terminfo/ is the marker: it must extract as a SIBLING of ghostty/ so libghostty's
  # TERMINFO=dirname(GHOSTTY_RESOURCES_DIR)/terminfo derivation resolves xterm-ghostty.
  RESOURCES_MARKER="agterm/Resources/terminfo"
-@@ -62,7 +68,7 @@ fi
+@@ -64,7 +70,7 @@ fi
  
  # a stale stamp restages BOTH: they come out of one build, and an artifact built from another revision
  # cannot be told apart from a current one.
@@ -60,7 +60,7 @@ index 48cb070..f6203f3 100755
    need_xc=true
    need_res=true
  fi
-@@ -150,7 +156,7 @@ if $need_xc || $need_res; then
+@@ -152,7 +158,7 @@ if $need_xc || $need_res; then
  
    echo "building GhosttyKit.xcframework with zig (a few minutes)..."
    ( cd "$ghostty_build" && "$ZIG" build -Doptimize=ReleaseFast -Demit-xcframework=true \
@@ -69,7 +69,7 @@ index 48cb070..f6203f3 100755
  
    if $need_xc; then
      echo "staging GhosttyKit.xcframework..."
-@@ -166,7 +172,7 @@ if $need_xc || $need_res; then
+@@ -168,7 +174,7 @@ if $need_xc || $need_res; then
      cp -R "$ghostty_build/zig-out/share/ghostty/themes" agterm/Resources/ghostty/
      cp -R "$ghostty_build/zig-out/share/terminfo" agterm/Resources/terminfo
    fi
@@ -78,7 +78,7 @@ index 48cb070..f6203f3 100755
  fi
  
  if $need_zmx; then
-@@ -183,11 +189,14 @@ if $need_zmx; then
+@@ -201,11 +207,14 @@ if $need_zmx; then
  
    patch_zig_float_h
  

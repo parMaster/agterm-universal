@@ -11,7 +11,7 @@ on:
           re-run a past release, or to try a newer upstream tag before its patch has
           been regenerated.
         required: false
-        default: "v0.32.0"
+        default: "v0.38.1"
       report_failure:
         description: Open an issue if the build fails (set by check-upstream.yml).
         type: boolean
