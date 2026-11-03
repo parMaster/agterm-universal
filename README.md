@@ -6,7 +6,7 @@ so it runs on Intel Macs too. Upstream ships arm64-only.
 This repo carries no copy of agterm's source — only a small patch
 (`patches/universal-build.patch`) and a GitHub Actions workflow. Every build clones
 `umputun/agterm` fresh at a chosen tag, applies the patch, and runs upstream's own
-`scripts/build.sh` unmodified.
+`scripts/build.sh` (patched only to pass both arches to `xcodebuild`).
 
 ## Getting a build
 
@@ -75,7 +75,7 @@ prompt — this is the manual equivalent of stripping quarantine.
 
 ## When a build fails at "Apply universal-build patch"
 
-This means the tag you're building has a `project.yml`/`scripts/setup.sh` shape that no longer
+This means the tag you're building has a `project.yml`/`scripts/build.sh`/`scripts/setup.sh` shape that no longer
 matches the patch's context lines — expected occasionally, since agterm's build scripts change
 fairly often (they gained a new bundled tool and bumped their zig version in the ~6 weeks after
 this patch was first written). It cuts both ways: a tag *older* than the one the patch was last
@@ -87,11 +87,13 @@ upstream's history, not to "this tag and everything after it." To fix:
    - `project.yml`: `ARCHS: arm64` → `ARCHS: arm64 x86_64`, and add `--arch arm64 --arch x86_64` to
      the post-build script's `swift build`/`--show-bin-path` invocations for `agtermctl` and
      `agterm-session-host`.
+   - `scripts/build.sh`: the `xcodebuild` call passes `ARCHS=arm64`, which overrides `project.yml`.
+     Change it to `ARCHS="arm64 x86_64"`, or the `agterm` binary itself comes out arm64-only.
    - `scripts/setup.sh`: change GhosttyKit's `-Dxcframework-target=native` to `universal`, fold that
-     choice into the rebuild-stamp check so switching back forces a rebuild, and build zmx twice —
+     choice into the GhosttyKit rebuild stamp so switching back forces a rebuild, and build zmx twice —
      once with `-Dtarget=aarch64-macos.14.0`, once with `-Dtarget=x86_64-macos.14.0`, each with its
      own `--prefix` — then combine the two with `lipo -create` instead of the single `install`.
-3. Regenerate the patch: `cd /tmp/agterm-src && git diff -- project.yml scripts/setup.sh > /path/to/agterm-universal/patches/universal-build.patch`
+3. Regenerate the patch: `cd /tmp/agterm-src && git diff -- project.yml scripts/build.sh scripts/setup.sh > /path/to/agterm-universal/patches/universal-build.patch`
 4. Verify it applies cleanly to a second, untouched clone of the same tag before committing:
    ```bash
    git clone --branch <tag> --depth 1 https://github.com/umputun/agterm /tmp/agterm-verify
