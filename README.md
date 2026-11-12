@@ -93,6 +93,8 @@ upstream's history, not to "this tag and everything after it." To fix:
      choice into the GhosttyKit rebuild stamp so switching back forces a rebuild, and build zmx twice —
      once with `-Dtarget=aarch64-macos.14.0`, once with `-Dtarget=x86_64-macos.14.0`, each with its
      own `--prefix` — then combine the two with `lipo -create` instead of the single `install`.
+     Keep upstream's single-target build when `AGTERM_ZMX_TARGET` is set, because
+     `setup-zmx-linux.sh` uses it to build zmx for Linux.
 3. Regenerate the patch: `cd /tmp/agterm-src && git diff -- project.yml scripts/build.sh scripts/setup.sh > /path/to/agterm-universal/patches/universal-build.patch`
 4. Verify it applies cleanly to a second, untouched clone of the same tag before committing:
    ```bash

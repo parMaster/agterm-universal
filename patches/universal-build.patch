@@ -1,5 +1,5 @@
 diff --git a/project.yml b/project.yml
-index e7b1012..2cd112c 100644
+index e7b10128..2cd112cb 100644
 --- a/project.yml
 +++ b/project.yml
 @@ -16,7 +16,7 @@ settings:
@@ -25,7 +25,7 @@ index e7b1012..2cd112c 100644
            cli_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agtermctl"
            host_dest="$CODESIGNING_FOLDER_PATH/Contents/MacOS/agterm-session-host"
 diff --git a/scripts/build.sh b/scripts/build.sh
-index eabef73..9d51085 100755
+index eabef73a..9d510857 100755
 --- a/scripts/build.sh
 +++ b/scripts/build.sh
 @@ -16,7 +16,9 @@ VERSION="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null | sed 's
@@ -40,10 +40,10 @@ index eabef73..9d51085 100755
 +  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" GIT_COMMIT="$GIT_COMMIT" ARCHS="arm64 x86_64" build
  echo "built: build/DerivedData/Build/Products/Release/agterm.app"
 diff --git a/scripts/setup.sh b/scripts/setup.sh
-index fd0788e..2b35dda 100755
+index 470fcd0e..e3c138d2 100755
 --- a/scripts/setup.sh
 +++ b/scripts/setup.sh
-@@ -19,19 +19,25 @@ GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
+@@ -19,8 +19,10 @@ GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
  GHOSTTY_REV="83fb95624b0439ee660c2679b43b38c8b63769cd"  # v1.4.0, 2026-10-27
  ZMX_REPO="https://github.com/neurosnap/zmx"
  ZMX_REV="8bab1f0173b07e79835ea372d749af3dbf0d0842"  # v0.8.1, 2026-09-05; SessionHostRuntime/DeviceAttributeResponder.swift copies its DA replies
@@ -51,9 +51,12 @@ index fd0788e..2b35dda 100755
 -ZMX_TARGET="aarch64-macos.14.0"
 +# local patch (agterm-universal): build zmx as a universal (arm64+x86_64) binary alongside
 +# GhosttyKit so agterm runs on Intel Macs too; each arch target is built separately, then lipo'd
-+# together below.
++# together below. An AGTERM_ZMX_TARGET override (the Linux build) still builds that one target.
 +ZMX_TARGET="universal(aarch64-macos.14.0,x86_64-macos.14.0)"
- # pin minor lines because the unversioned zig formula rolls; zmx stays on 0.16 independently.
+ # setup-zmx-linux.sh builds the same pin for a Linux target into its own stage dir and stamp. Unquoted, so
+ # CI's `^ZMX_TARGET="` read of the line above matches it alone.
+ ZMX_TARGET=${AGTERM_ZMX_TARGET:-$ZMX_TARGET}
+@@ -28,13 +30,17 @@ ZMX_TARGET=${AGTERM_ZMX_TARGET:-$ZMX_TARGET}
  GHOSTTY_ZIG_FORMULA="zig@0.17"
  ZMX_ZIG_FORMULA="zig@0.16"
  XCFRAMEWORK_DIR="GhosttyKit.xcframework"
@@ -69,33 +72,44 @@ index fd0788e..2b35dda 100755
  GHOSTTY_PATCH_DIGEST="$(cat "$GHOSTTY_PATCH_DIR"/*.patch | shasum -a 256 | cut -c1-16)"
 -GHOSTTY_STAMP="$GHOSTTY_REV $GHOSTTY_PATCH_DIGEST"
 +GHOSTTY_STAMP="$GHOSTTY_REV $GHOSTTY_PATCH_DIGEST $XCFRAMEWORK_TARGET"
- ZMX_STAGE_DIR="agterm/Resources/zmx"
- ZMX_STAMP_FILE=".zmx-build-stamp"
+ ZMX_STAGE_DIR="${AGTERM_ZMX_STAGE_DIR:-agterm/Resources/zmx}"
+ ZMX_STAMP_FILE="${AGTERM_ZMX_STAMP_FILE:-.zmx-build-stamp}"
  # applied in name order over the plain pin; scripts/zmx-patches/README.md says what each one is for.
-@@ -176,7 +182,7 @@ if $need_xc || $need_res; then
+@@ -182,7 +188,7 @@ if $need_xc || $need_res; then
    GHOSTTY_ZIG="$(zig_for "$GHOSTTY_ZIG_FORMULA")"
    echo "building GhosttyKit.xcframework with zig (a few minutes)..."
    ( cd "$ghostty_build" && "$GHOSTTY_ZIG" build -Doptimize=ReleaseFast -Demit-xcframework=true \
 -      -Dxcframework-target=native -Demit-macos-app=false )
 +      "-Dxcframework-target=$XCFRAMEWORK_TARGET" -Demit-macos-app=false )
- 
-   if $need_xc; then
-     echo "staging GhosttyKit.xcframework..."
-@@ -226,11 +232,14 @@ if $need_zmx; then
+   # before staging, so a red test never leaves artifacts under a stamp that marks them current
+   echo "testing the teardown patch..."
+   ( cd "$ghostty_build" && "$GHOSTTY_ZIG" build test -Dtest-filter=teardown -Demit-macos-app=false )
+@@ -235,13 +241,25 @@ if $need_zmx; then
    ZMX_ZIG="$(zig_for "$ZMX_ZIG_FORMULA")"
    patch_zig_float_h
  
 -  echo "building zmx with zig..."
 -  ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget="$ZMX_TARGET" )
-+  echo "building zmx with zig for arm64 and x86_64..."
-+  ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget=aarch64-macos.14.0 --prefix "$BUILD_DIR/zmx-arm64" )
-+  ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget=x86_64-macos.14.0 --prefix "$BUILD_DIR/zmx-x86_64" )
++  if [[ -n "${AGTERM_ZMX_TARGET:-}" ]]; then
++    echo "building zmx with zig..."
++    ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget="$ZMX_TARGET" )
++  else
++    echo "building zmx with zig for arm64 and x86_64..."
++    ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget=aarch64-macos.14.0 --prefix "$BUILD_DIR/zmx-arm64" )
++    ( cd "$zmx_build" && "$ZMX_ZIG" build -Doptimize=ReleaseSafe -Dtarget=x86_64-macos.14.0 --prefix "$BUILD_DIR/zmx-x86_64" )
++  fi
+   echo "testing the zmx patches..."
+   ( cd "$zmx_build" && "$ZMX_ZIG" build test )
    rm -rf "$ZMX_STAGE_DIR"
    mkdir -p "$ZMX_STAGE_DIR"
 -  install -m 0755 "$zmx_build/zig-out/bin/zmx" "$ZMX_STAGE_DIR/zmx"
-+  lipo -create -output "$ZMX_STAGE_DIR/zmx" \
-+    "$BUILD_DIR/zmx-arm64/bin/zmx" "$BUILD_DIR/zmx-x86_64/bin/zmx"
-+  chmod 0755 "$ZMX_STAGE_DIR/zmx"
++  if [[ -n "${AGTERM_ZMX_TARGET:-}" ]]; then
++    install -m 0755 "$zmx_build/zig-out/bin/zmx" "$ZMX_STAGE_DIR/zmx"
++  else
++    lipo -create -output "$ZMX_STAGE_DIR/zmx" \
++      "$BUILD_DIR/zmx-arm64/bin/zmx" "$BUILD_DIR/zmx-x86_64/bin/zmx"
++    chmod 0755 "$ZMX_STAGE_DIR/zmx"
++  fi
    cp "$zmx_build/LICENSE" "$ZMX_STAGE_DIR/LICENSE"
    printf '%s\n' "$ZMX_STAMP" > "$ZMX_STAMP_FILE"
  fi
