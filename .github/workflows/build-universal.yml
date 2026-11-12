@@ -60,6 +60,43 @@ jobs:
         working-directory: agterm-src
         run: ./scripts/build.sh
 
+      # `agtermctl server install` refuses to run without this file. Upstream's release.sh writes it after
+      # xcodebuild; build.sh doesn't. The sums must be of upstream's published tarballs, because the install
+      # downloads those exact files from upstream and compares.
+      - name: Seal agterm-server checksums
+        timeout-minutes: 5
+        working-directory: agterm-src
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          app="build/DerivedData/Build/Products/Release/agterm.app"
+          tag="${{ steps.resolve.outputs.ref }}"
+          version="${tag#v}"
+          dir="$PWD/build/server"
+          mkdir -p "$dir"
+          assets=()
+          for arch in aarch64 x86_64; do
+            asset="agterm-server-$version-linux-$arch.tar.gz"
+            if ! gh release download "$tag" --repo umputun/agterm --pattern "$asset" --dir "$dir" --clobber; then
+              echo "::error::upstream release $tag has no $asset" >&2
+              exit 1
+            fi
+            [ -s "$dir/$asset" ] || { echo "::error::upstream release $tag has no $asset" >&2; exit 1; }
+            assets+=("$asset")
+          done
+          (cd "$dir" && shasum -a 256 "${assets[@]}") > "$app/Contents/Resources/agterm-server.sha256"
+          cat "$app/Contents/Resources/agterm-server.sha256"
+          # app only, never --deep: that would stamp the app's entitlements onto the helpers
+          codesign --force --entitlements agterm/agterm.entitlements --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          for helper in agtermctl zmx agterm-session-host; do
+            if codesign -d --entitlements - "$app/Contents/MacOS/$helper" 2>/dev/null | grep -q 'com.apple.security'; then
+              echo "::error::$helper carries entitlements after the re-seal" >&2
+              exit 1
+            fi
+          done
+
       - name: Verify universal binaries
         working-directory: agterm-src
         run: |
@@ -91,10 +128,10 @@ jobs:
           set -euo pipefail
           tag="${{ steps.resolve.outputs.ref }}-universal"
           gh release delete "$tag" --repo "${{ github.repository }}" --yes --cleanup-tag 2>/dev/null || true
-          gh release create "$tag" "${{ steps.package.outputs.zip_path }}" \
+          gh release create "$tag" "${{ steps.package.outputs.zip_path }}" agterm-src/build/server/agterm-server-*.tar.gz \
             --repo "${{ github.repository }}" \
             --title "agterm ${{ steps.resolve.outputs.ref }} (universal arm64+x86_64)" \
-            --notes "Unofficial universal (arm64+x86_64) build of umputun/agterm ${{ steps.resolve.outputs.ref }}, built by applying patches/universal-build.patch on top of unmodified upstream source. Ad-hoc signed, not notarized — see this repo's README before opening it."
+            --notes "Unofficial universal (arm64+x86_64) build of umputun/agterm ${{ steps.resolve.outputs.ref }}, built by applying patches/universal-build.patch on top of unmodified upstream source. Ad-hoc signed, not notarized — see this repo's README before opening it. The agterm-server tarballs are unmodified copies of upstream's, whose checksums the app carries for agtermctl server install."
 
       - name: Open issue for build failure
         if: failure() && inputs.report_failure

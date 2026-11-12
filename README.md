@@ -14,8 +14,14 @@ Go to Actions → "Build universal agterm" → "Run workflow". The `agterm_ref` 
 tag `patches/universal-build.patch` is currently verified against — leave it as-is for a normal
 build. Override it to re-run a specific past release, or to try a newer upstream tag before its
 patch has been regenerated (may fail at "Apply universal-build patch" — see below, and note that
-requesting an *older* tag than the pinned one can fail there too). When it finishes, the build is
-attached as a release in this repo's Releases tab, tagged `<upstream-tag>-universal`.
+requesting an *older* tag than the pinned one can fail there too). Tags before v0.42.0 always fail:
+the build needs upstream's agterm-server tarballs, which start with v0.42.0. When it finishes, the
+build is attached as a release in this repo's Releases tab, tagged `<upstream-tag>-universal`.
+
+Like upstream's, each release carries the two `agterm-server-<version>-linux-<arch>.tar.gz` files,
+unmodified copies of upstream's. The workflow seals their sha256 sums into the app as
+`Contents/Resources/agterm-server.sha256` and re-signs it ad hoc. `agtermctl server install HOST` needs
+that file. It downloads the tarball from upstream and refuses one whose sum doesn't match.
 
 ## Automatic builds of new upstream releases
 
