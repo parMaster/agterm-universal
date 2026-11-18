@@ -1,5 +1,5 @@
 diff --git a/project.yml b/project.yml
-index e7b10128..2cd112cb 100644
+index 6fe812bf..02159e19 100644
 --- a/project.yml
 +++ b/project.yml
 @@ -16,7 +16,7 @@ settings:
@@ -11,7 +11,7 @@ index e7b10128..2cd112cb 100644
      ONLY_ACTIVE_ARCH: NO
      SWIFT_STRICT_CONCURRENCY: complete
      # The agtermTests scheme intentionally builds serially so the app's deep-sign
-@@ -146,9 +146,9 @@ targets:
+@@ -154,9 +154,9 @@ targets:
            # otherwise trip the re-seal below.
            rm -rf "$CODESIGNING_FOLDER_PATH/Contents/Resources/AppIcon.icon"
            core="$SRCROOT/agtermCore"
@@ -40,7 +40,7 @@ index eabef73a..9d510857 100755
 +  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" GIT_COMMIT="$GIT_COMMIT" ARCHS="arm64 x86_64" build
  echo "built: build/DerivedData/Build/Products/Release/agterm.app"
 diff --git a/scripts/setup.sh b/scripts/setup.sh
-index 470fcd0e..e3c138d2 100755
+index 13ba8614..5326a9b0 100755
 --- a/scripts/setup.sh
 +++ b/scripts/setup.sh
 @@ -19,8 +19,10 @@ GHOSTTY_REPO="https://github.com/ghostty-org/ghostty"
@@ -82,9 +82,9 @@ index 470fcd0e..e3c138d2 100755
 -      -Dxcframework-target=native -Demit-macos-app=false )
 +      "-Dxcframework-target=$XCFRAMEWORK_TARGET" -Demit-macos-app=false )
    # before staging, so a red test never leaves artifacts under a stamp that marks them current
-   echo "testing the teardown patch..."
-   ( cd "$ghostty_build" && "$GHOSTTY_ZIG" build test -Dtest-filter=teardown -Demit-macos-app=false )
-@@ -235,13 +241,25 @@ if $need_zmx; then
+   echo "testing the libghostty patches..."
+   ( cd "$ghostty_build" && "$GHOSTTY_ZIG" build test -Dtest-filter=teardown -Dtest-filter="url regex" \
+@@ -236,13 +242,25 @@ if $need_zmx; then
    ZMX_ZIG="$(zig_for "$ZMX_ZIG_FORMULA")"
    patch_zig_float_h
  
